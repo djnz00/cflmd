@@ -47,7 +47,7 @@ jobs:
             echo "should_release=true" >> "$GITHUB_OUTPUT"
           fi
 
-  build-release:
+  verify-release:
     needs: resolve-release
     if: ${{ needs.resolve-release.outputs.should_release == 'true' }}
     runs-on: ubuntu-latest
@@ -70,11 +70,139 @@ jobs:
       - name: Run test suite
         run: make test
 
-      - name: Build release artifacts
+  build-platform-binaries:
+    needs: resolve-release
+    if: ${{ needs.resolve-release.outputs.should_release == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: linux-x64
+          - runner: macos-15-intel
+            target: macos-x64
+          - runner: macos-15
+            target: macos-arm64
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '25'
+          package-manager-cache: false
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build platform executable
+        run: make dist DIST_TARGETS=${{ matrix.target }}
+
+      - name: Ad-hoc sign macOS executable
+        if: ${{ startsWith(matrix.target, 'macos-') }}
+        run: codesign --force --sign - releases/cflmd-${{ matrix.target }}
+
+      - name: Verify macOS signature
+        if: ${{ startsWith(matrix.target, 'macos-') }}
+        run: codesign --verify --verbose=4 releases/cflmd-${{ matrix.target }}
+
+      - name: Smoke test packaged executable
+        run: |
+          rm -rf dist/smoke-test
+          mkdir -p dist/smoke-test/archive dist/smoke-test/extract
+          cp releases/cflmd-${{ matrix.target }} dist/smoke-test/archive/cflmd
+          tar -C dist/smoke-test/archive -czf dist/smoke-test/cflmd-${{ matrix.target }}.tar.gz cflmd
+          tar -C dist/smoke-test/extract -xzf dist/smoke-test/cflmd-${{ matrix.target }}.tar.gz
+          ./dist/smoke-test/extract/cflmd --help
+
+      - name: Package executable artifact for release assembly
+        run: |
+          mkdir -p dist/workflow-artifacts
+          tar -C releases -cf dist/workflow-artifacts/cflmd-${{ matrix.target }}.tar cflmd-${{ matrix.target }}
+
+      - name: Upload executable artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: executable-${{ matrix.target }}
+          if-no-files-found: error
+          path: dist/workflow-artifacts/cflmd-${{ matrix.target }}.tar
+
+  package-release:
+    needs:
+      - resolve-release
+      - verify-release
+      - build-platform-binaries
+    if: ${{ needs.resolve-release.outputs.should_release == 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '25'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Download platform executables
+        uses: actions/download-artifact@v6
+        with:
+          pattern: executable-*
+          merge-multiple: true
+          path: dist/workflow-artifacts
+
+      - name: Rehydrate signed release executables
+        run: |
+          rm -rf dist/release-assets dist/npm dist/homebrew
+          mkdir -p releases
+          for archive in dist/workflow-artifacts/*.tar; do
+            tar -C releases -xf "$archive"
+          done
+          chmod 0755 releases/cflmd-*
+
+      - name: Verify release executables are present
+        run: |
+          test -x releases/cflmd-linux-x64
+          test -x releases/cflmd-macos-x64
+          test -x releases/cflmd-macos-arm64
+          ./releases/cflmd-linux-x64 --help
+
+      - name: Build release metadata and archives
+        env:
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+        run: node scripts/build-release-assets.mjs
+
+      - name: Build npm package and Homebrew formula
         env:
           RELEASE_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
-        run: pnpm run release:verify
+        run: |
+          mkdir -p dist/npm dist/homebrew
+          npm pack --pack-destination dist/npm
+          node scripts/render-homebrew-formula.mjs \
+            --manifest dist/release-assets/release-manifest.json \
+            --repo "${RELEASE_REPO}" \
+            --license "$(node -p "require('./package.json').license")" \
+            > dist/homebrew/cflmd.rb
+
+      - name: Validate packaged release outputs
+        env:
+          RELEASE_VERSION: ${{ needs.resolve-release.outputs.version }}
+        run: |
+          test -f dist/release-assets/cflmd-linux-x64.tar.gz
+          test -f dist/release-assets/cflmd-macos-x64.tar.gz
+          test -f dist/release-assets/cflmd-macos-arm64.tar.gz
+          test -f dist/release-assets/SHA256SUMS
+          test -f dist/release-assets/release-manifest.json
+          test -f dist/npm/cflmd-${RELEASE_VERSION}.tgz
+          test -f dist/homebrew/cflmd.rb
+          grep -q 'cflmd-linux-x64.tar.gz' dist/homebrew/cflmd.rb
+          grep -q 'cflmd-macos-x64.tar.gz' dist/homebrew/cflmd.rb
+          grep -q 'cflmd-macos-arm64.tar.gz' dist/homebrew/cflmd.rb
+          grep -q "version \"${RELEASE_VERSION}\"" dist/homebrew/cflmd.rb
 
       - name: Create or update GitHub release
         env:
