@@ -13,6 +13,7 @@ import {
 } from '../lib/markdown-document.js';
 import { convertStorageToMarkdown } from '../lib/storage-to-markdown.js';
 import { main } from '../lib/cli.js';
+import { cliVersion } from '../lib/version.js';
 
 const fixturesDirectory = fileURLToPath(new URL('./fixtures/', import.meta.url));
 const storageFixturePath = join(fixturesDirectory, 'storage-roundtrip-input.atl');
@@ -76,7 +77,40 @@ describe('cflmd CLI', () => {
     expect(stdout.text()).toContain('export');
     expect(stdout.text()).toContain('import');
     expect(stdout.text()).toContain('put <url>');
+    expect(stdout.text()).toContain('--version, -v');
     expect(stdout.text()).toContain('--user=USER');
+  });
+
+  it('prints the current version with --version', async () => {
+    const stdout = createWriter();
+    const stderr = createWriter();
+
+    const exitCode = await main({
+      argv: ['--version'],
+      env: {},
+      stderr: stderr.writer,
+      stdout: stdout.writer
+    });
+
+    expect(exitCode).toBe(0);
+    expect(stderr.text()).toBe('');
+    expect(stdout.text()).toBe(`${cliVersion}\n`);
+  });
+
+  it('prints the current version with -v', async () => {
+    const stdout = createWriter();
+    const stderr = createWriter();
+
+    const exitCode = await main({
+      argv: ['-v'],
+      env: {},
+      stderr: stderr.writer,
+      stdout: stdout.writer
+    });
+
+    expect(exitCode).toBe(0);
+    expect(stderr.text()).toBe('');
+    expect(stdout.text()).toBe(`${cliVersion}\n`);
   });
 
   it('prints command-specific help for export --help', async () => {
