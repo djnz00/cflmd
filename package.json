@@ -1,0 +1,57 @@
+{
+  "name": "cflmd",
+  "version": "0.4.1",
+  "description": "CLI for working with Atlassian Confluence page content as Markdown",
+  "type": "module",
+  "bin": {
+    "cflmd": "./cflmd"
+  },
+  "files": [
+    "cflmd",
+    "lib",
+    "README.md"
+  ],
+  "homepage": "https://github.com/djnz00/cflmd#readme",
+  "main": "./lib/index.js",
+  "exports": "./lib/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/djnz00/cflmd.git"
+  },
+  "bugs": {
+    "url": "https://github.com/djnz00/cflmd/issues"
+  },
+  "scripts": {
+    "bump": "./scripts/bump",
+    "dist": "node scripts/build-dist.mjs",
+    "release:assets": "node scripts/build-release-assets.mjs",
+    "release:verify": "node scripts/build-release-candidate.mjs",
+    "render:formula": "node scripts/render-homebrew-formula.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "atlassian",
+    "cflmd",
+    "cli",
+    "confluence"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "ISC",
+  "packageManager": "pnpm@10.26.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.3",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "markdown-it": "^14.1.1",
+    "turndown": "^7.2.2",
+    "turndown-plugin-gfm": "^1.0.2"
+  }
+}

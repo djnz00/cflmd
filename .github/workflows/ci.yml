@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '25'
+          package-manager-cache: false
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run test suite
+        run: make test
+
+  release-readiness:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '25'
+          package-manager-cache: false
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build release candidate artifacts
+        env:
+          RELEASE_REPO: ${{ github.repository }}
+          RELEASE_TAG: pr-${{ github.event.pull_request.number || github.ref_name }}
+        run: pnpm run release:verify
+
+      - name: Upload release candidate artifacts
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: release-candidate
+          if-no-files-found: ignore
+          path: |
+            dist/release-assets/*
+            dist/npm/*.tgz
+            dist/homebrew/cflmd.rb

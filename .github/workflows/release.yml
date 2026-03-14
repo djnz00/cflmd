@@ -1,0 +1,145 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resolve-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      should_release: ${{ steps.check.outputs.should_release }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '25'
+          package-manager-cache: false
+
+      - name: Resolve package version
+        id: version
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether this version is already released
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-release:
+    needs: resolve-release
+    if: ${{ needs.resolve-release.outputs.should_release == 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '25'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run test suite
+        run: make test
+
+      - name: Build release artifacts
+        env:
+          RELEASE_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+        run: pnpm run release:verify
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+        run: |
+          gh release view "${RELEASE_TAG}" >/dev/null 2>&1 || \
+            gh release create "${RELEASE_TAG}" --target "${GITHUB_SHA}" --generate-notes
+
+          gh release upload "${RELEASE_TAG}" \
+            dist/release-assets/* \
+            dist/npm/*.tgz \
+            dist/homebrew/cflmd.rb \
+            --clobber
+
+      - name: Publish package to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_VERSION: ${{ needs.resolve-release.outputs.version }}
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "::warning::NPM_TOKEN is not configured; skipping npm publish."
+            exit 0
+          fi
+
+          if npm view "cflmd@${RELEASE_VERSION}" version >/dev/null 2>&1; then
+            echo "cflmd@${RELEASE_VERSION} is already published to npm."
+            exit 0
+          fi
+
+          npm publish "dist/npm/cflmd-${RELEASE_VERSION}.tgz" --access public
+
+      - name: Update Homebrew tap
+        env:
+          TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO }}
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+        run: |
+          if [ -z "${TAP_REPO}" ] || [ -z "${TAP_TOKEN}" ]; then
+            echo "::warning::Homebrew tap sync is not configured; skipping tap update."
+            exit 0
+          fi
+
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/${TAP_REPO}.git" tap
+          mkdir -p tap/Formula
+          cp dist/homebrew/cflmd.rb tap/Formula/cflmd.rb
+
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- Formula/cflmd.rb; then
+            echo "Formula already up to date."
+            exit 0
+          fi
+
+          git add Formula/cflmd.rb
+          git commit -m "Update cflmd to ${RELEASE_TAG}"
+          git push
+
+  no-release:
+    needs: resolve-release
+    if: ${{ needs.resolve-release.outputs.should_release != 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Explain skipped release
+        run: echo "package.json is still at ${{ needs.resolve-release.outputs.version }} and that version is already released."

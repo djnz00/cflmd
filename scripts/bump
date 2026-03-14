@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: ./scripts/bump [--minor|--major]
+
+Default release type is patch.
+The script bumps package.json, commits the change, pushes the current branch,
+and creates a pull request targeting main if one does not already exist.
+GitHub Actions cuts the vX.Y.Z tag and publishes the release after that PR merges.
+EOF
+}
+
+release_type='patch'
+
+case "${1-}" in
+  '')
+    ;;
+  --patch)
+    release_type='patch'
+    ;;
+  --minor)
+    release_type='minor'
+    ;;
+  --major)
+    release_type='major'
+    ;;
+  --help|-h)
+    usage
+    exit 0
+    ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac
+
+if [[ $# -gt 1 ]]; then
+  usage >&2
+  exit 1
+fi
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+root_dir="$(cd "${script_dir}/.." && pwd)"
+
+cd "${root_dir}"
+
+branch="$(git symbolic-ref --quiet --short HEAD)" || {
+  echo "scripts/bump must be run from a named branch, not detached HEAD." >&2
+  exit 1
+}
+
+if [[ "${branch}" == 'main' ]]; then
+  echo "scripts/bump must be run from a release branch, not main." >&2
+  exit 1
+fi
+
+if ! git diff --quiet --ignore-submodules -- || ! git diff --cached --quiet --ignore-submodules --; then
+  echo "scripts/bump requires a clean working tree." >&2
+  exit 1
+fi
+
+command -v gh >/dev/null 2>&1 || {
+  echo "scripts/bump requires the GitHub CLI (gh)." >&2
+  exit 1
+}
+
+git remote get-url origin >/dev/null 2>&1 || {
+  echo "scripts/bump requires an origin remote." >&2
+  exit 1
+}
+
+current_version="$(node scripts/versioning.mjs get-version package.json)"
+next_version="$(node scripts/versioning.mjs next-version "${current_version}" "${release_type}")"
+tag="v${next_version}"
+
+if git rev-parse --verify --quiet "refs/tags/${tag}" >/dev/null; then
+  echo "Tag ${tag} already exists locally." >&2
+  exit 1
+fi
+
+if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+  echo "Tag ${tag} already exists on origin." >&2
+  exit 1
+fi
+
+node scripts/versioning.mjs set-version package.json "${next_version}"
+
+git add package.json
+git commit -m "Release ${tag}"
+git push --set-upstream origin "${branch}"
+
+if pr_url="$(gh pr view --json url --jq .url 2>/dev/null)"; then
+  printf 'Updated existing pull request: %s\n' "${pr_url}"
+  exit 0
+fi
+
+pr_url="$(
+  gh pr create \
+    --base main \
+    --head "${branch}" \
+    --title "Release ${tag}" \
+    --body "Automated semantic version bump to ${next_version}. Merging this PR causes CI/CD to create tag ${tag}, publish the GitHub release assets, and, when configured, publish npm and update the Homebrew tap."
+)"
+
+printf 'Created pull request: %s\n' "${pr_url}"
