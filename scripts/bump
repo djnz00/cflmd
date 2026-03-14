@@ -80,9 +80,9 @@ if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; t
   exit 1
 fi
 
-node scripts/versioning.mjs set-version package.json "${next_version}"
+node scripts/versioning.mjs set-release-version package.json lib/version.js "${next_version}"
 
-git add package.json
+git add package.json lib/version.js
 git commit -m "Release ${tag}"
 git push --set-upstream origin "${branch}"
 

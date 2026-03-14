@@ -6,11 +6,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 
 export function nextVersion(version, releaseType = 'patch') {
-  const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(version);
-
-  if (!match) {
-    throw new Error(`Invalid semantic version: ${version}`);
-  }
+  const match = assertSemanticVersion(version);
 
   let [major, minor, patch] = match.slice(1).map(Number);
 
@@ -41,13 +37,40 @@ export async function readPackageVersion(filePath) {
 
 export async function writePackageVersion(filePath, version) {
   const resolvedPath = resolvePath(filePath);
+  assertSemanticVersion(version);
   const packageJson = JSON.parse(await readFile(resolvedPath, 'utf8'));
   packageJson.version = version;
   await writeFile(resolvedPath, `${JSON.stringify(packageJson, null, 2)}\n`);
 }
 
+export function formatVersionModule(version) {
+  assertSemanticVersion(version);
+  return `export const cliVersion = '${version}';\n`;
+}
+
+export async function writeVersionModule(filePath, version) {
+  await writeFile(resolvePath(filePath), formatVersionModule(version));
+}
+
+export async function writeReleaseVersion(packageFilePath, versionModulePath, version) {
+  await Promise.all([
+    writePackageVersion(packageFilePath, version),
+    writeVersionModule(versionModulePath, version)
+  ]);
+}
+
 function resolvePath(filePath) {
   return path.resolve(rootDir, filePath);
+}
+
+function assertSemanticVersion(version) {
+  const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(version);
+
+  if (!match) {
+    throw new Error(`Invalid semantic version: ${version}`);
+  }
+
+  return match;
 }
 
 async function main(argv) {
@@ -65,6 +88,10 @@ async function main(argv) {
     case 'set-version':
       ensureArgCount(command, args, 2);
       await writePackageVersion(args[0], args[1]);
+      return;
+    case 'set-release-version':
+      ensureArgCount(command, args, 3);
+      await writeReleaseVersion(args[0], args[1], args[2]);
       return;
     case '--help':
     case '-h':
@@ -89,6 +116,7 @@ function printHelp() {
       '  node scripts/versioning.mjs get-version package.json',
       '  node scripts/versioning.mjs next-version 0.1.0 patch',
       '  node scripts/versioning.mjs set-version package.json 0.1.1',
+      '  node scripts/versioning.mjs set-release-version package.json lib/version.js 0.1.1',
       ''
     ].join('\n')
   );

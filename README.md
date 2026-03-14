@@ -54,6 +54,7 @@ curl -fsSLO https://github.com/djnz00/cflmd/releases/latest/download/SHA256SUMS
 grep 'cflmd-linux-x64.tar.gz$' SHA256SUMS | shasum -a 256 -c -
 tar xzf cflmd-linux-x64.tar.gz
 install -m 0755 cflmd ~/.local/bin/cflmd
+cflmd --version
 cflmd --help
 ```
 
