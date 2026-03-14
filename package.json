@@ -1,6 +1,6 @@
 {
   "name": "cflmd",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "CLI for working with Atlassian Confluence page content as Markdown",
   "type": "module",
   "bin": {

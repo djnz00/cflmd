@@ -56,11 +56,6 @@ if [[ "${branch}" == 'main' ]]; then
   exit 1
 fi
 
-if ! git diff --quiet --ignore-submodules -- || ! git diff --cached --quiet --ignore-submodules --; then
-  echo "scripts/bump requires a clean working tree." >&2
-  exit 1
-fi
-
 command -v gh >/dev/null 2>&1 || {
   echo "scripts/bump requires the GitHub CLI (gh)." >&2
   exit 1
