@@ -127,7 +127,7 @@ jobs:
           ./dist/smoke-test/extract/cflmd --help
 
       - name: Capture macOS x64 crash diagnostics
-        if: ${{ matrix.target == 'macos-x64' && (steps.smoke_raw.outcome != 'success' || steps.smoke_packaged.outcome != 'success') }}
+        if: ${{ matrix.target == 'macos-x64' && (steps.smoke_raw.conclusion != 'success' || steps.smoke_packaged.conclusion != 'success') }}
         continue-on-error: true
         run: |
           mkdir -p dist/diagnostics/crash-reports
@@ -176,7 +176,7 @@ jobs:
           fi
 
       - name: Upload macOS x64 crash diagnostics
-        if: ${{ matrix.target == 'macos-x64' && (steps.smoke_raw.outcome != 'success' || steps.smoke_packaged.outcome != 'success') }}
+        if: ${{ matrix.target == 'macos-x64' && (steps.smoke_raw.conclusion != 'success' || steps.smoke_packaged.conclusion != 'success') }}
         uses: actions/upload-artifact@v6
         with:
           name: diagnostics-macos-x64
@@ -186,10 +186,10 @@ jobs:
             dist/diagnostics/crash-reports/*
 
       - name: Enforce smoke tests
-        if: ${{ steps.smoke_raw.outcome != 'success' || steps.smoke_packaged.outcome != 'success' }}
+        if: ${{ steps.smoke_raw.conclusion != 'success' || steps.smoke_packaged.conclusion != 'success' }}
         run: |
-          echo "Raw executable smoke test: ${{ steps.smoke_raw.outcome }}"
-          echo "Packaged executable smoke test: ${{ steps.smoke_packaged.outcome }}"
+          echo "Raw executable smoke test: ${{ steps.smoke_raw.conclusion }}"
+          echo "Packaged executable smoke test: ${{ steps.smoke_packaged.conclusion }}"
           exit 1
 
       - name: Package executable artifact for release assembly
