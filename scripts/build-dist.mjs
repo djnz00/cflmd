@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import {
   chmod,
+  copyFile,
   mkdir,
   mkdtemp,
   readFile,
@@ -23,6 +24,10 @@ const rootDir = path.resolve(__dirname, '..');
 const releasesDir = path.join(rootDir, 'releases');
 const distCacheDir = resolveDistCacheDir();
 const nodeVersion = process.versions.node;
+const seaBlobResourceName = 'NODE_SEA_BLOB';
+const seaFuse = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2';
+const seaMachoSegmentName = 'NODE_SEA';
+const postjectCliPath = path.join(rootDir, 'node_modules', 'postject', 'dist', 'cli.js');
 const targets = new Map([
   ['linux-x64', { archivePlatform: 'linux-x64', outputName: 'cflmd-linux-x64' }],
   ['macos-x64', { archivePlatform: 'darwin-x64', outputName: 'cflmd-macos-x64' }],
@@ -106,7 +111,7 @@ function assertSupportedNodeVersion() {
     return;
   }
 
-  throw new Error('make dist requires Node.js 25.5 or newer to use --build-sea.');
+  throw new Error('make dist requires Node.js 25.5 or newer for SEA builds.');
 }
 
 function parseTargets(rawTargets) {
@@ -170,29 +175,41 @@ async function buildExecutable({
   });
   const executablePath = path.join(releasesDir, targetConfig.outputName);
   const configPath = path.join(workDir, `${targetConfig.outputName}.sea.json`);
+  const usePostjectFallback = shouldUsePostjectFallback(targetName);
 
   await assertFileExists(nodeBinary);
   await rm(executablePath, { force: true });
 
-  await writeFile(
-    configPath,
-    `${JSON.stringify(
-      {
-        disableExperimentalSEAWarning: true,
-        executable: nodeBinary,
-        main: bundlePath,
-        mainFormat: 'commonjs',
-        output: executablePath,
-        useCodeCache: false,
-        useSnapshot: false
-      },
-      null,
-      2
-    )}\n`
-  );
+  if (usePostjectFallback) {
+    await buildExecutableWithPostject({
+      bundlePath,
+      configPath,
+      executablePath,
+      nodeBinary,
+      targetConfig
+    });
+  } else {
+    await writeFile(
+      configPath,
+      `${JSON.stringify(
+        {
+          disableExperimentalSEAWarning: true,
+          executable: nodeBinary,
+          main: bundlePath,
+          mainFormat: 'commonjs',
+          output: executablePath,
+          useCodeCache: false,
+          useSnapshot: false
+        },
+        null,
+        2
+      )}\n`
+    );
 
-  log(`Building ${targetConfig.outputName}`);
-  await run(process.execPath, ['--build-sea', configPath], { cwd: rootDir });
+    log(`Building ${targetConfig.outputName}`);
+    await run(process.execPath, ['--build-sea', configPath], { cwd: rootDir });
+  }
+
   await chmod(executablePath, 0o755);
 
   if (targetName.startsWith('macos-') && process.platform !== 'darwin') {
@@ -202,6 +219,59 @@ async function buildExecutable({
         `codesign --sign - ${executablePath}`
     );
   }
+}
+
+// Node's documented blob+postject flow remains supported and is more reliable
+// than --build-sea for the macOS x64 artifact on GitHub's Intel runners.
+async function buildExecutableWithPostject({
+  bundlePath,
+  configPath,
+  executablePath,
+  nodeBinary,
+  targetConfig
+}) {
+  const blobPath = path.join(path.dirname(configPath), `${targetConfig.outputName}.blob`);
+
+  await assertFileExists(postjectCliPath);
+  await writeFile(
+    configPath,
+    `${JSON.stringify(
+      {
+        disableExperimentalSEAWarning: true,
+        main: bundlePath,
+        mainFormat: 'commonjs',
+        output: blobPath,
+        useCodeCache: false,
+        useSnapshot: false
+      },
+      null,
+      2
+    )}\n`
+  );
+
+  log(
+    `Building ${targetConfig.outputName} with --experimental-sea-config and postject`
+  );
+  await run(process.execPath, ['--experimental-sea-config', configPath], { cwd: rootDir });
+  await assertFileExists(blobPath);
+
+  await copyFile(nodeBinary, executablePath);
+  await run('codesign', ['--remove-signature', executablePath], { cwd: rootDir });
+  await run(
+    process.execPath,
+    [
+      postjectCliPath,
+      executablePath,
+      seaBlobResourceName,
+      blobPath,
+      '--sentinel-fuse',
+      seaFuse,
+      '--macho-segment-name',
+      seaMachoSegmentName
+    ],
+    { cwd: rootDir }
+  );
+  await run('codesign', ['--force', '--sign', '-', executablePath], { cwd: rootDir });
 }
 
 function resolveArchive(shasums, archivePlatform) {
@@ -303,6 +373,10 @@ function resolveRuntimeDir(targetConfig) {
     'runtimes',
     `node-v${nodeVersion}-${targetConfig.archivePlatform}`
   );
+}
+
+function shouldUsePostjectFallback(targetName) {
+  return targetName === 'macos-x64' && process.platform === 'darwin';
 }
 
 async function downloadFile(url, destinationPath) {

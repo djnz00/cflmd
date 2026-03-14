@@ -249,7 +249,7 @@ By default this writes:
 - `releases/cflmd-linux-x64`
 - `releases/cflmd-macos-x64`
 
-`make dist` bundles the CLI with `esbuild`, caches the matching official Node.js runtime archives and extracted runtimes, and generates self-contained executables with `node --build-sea`.
+`make dist` bundles the CLI with `esbuild`, caches the matching official Node.js runtime archives and extracted runtimes, and generates self-contained executables with Node SEA tooling. Most targets use `node --build-sea`; native `macos-x64` builds use the older documented blob-plus-`postject` path.
 
 The dist cache is persistent across runs, so repeated `make dist` invocations reuse previously downloaded artifacts when they match the current Node.js version and target. By default the cache lives at `${XDG_CACHE_HOME:-~/.cache}/cflmd/dist`. Override it with `DIST_CACHE_DIR=/path/to/cache make dist`.
 
