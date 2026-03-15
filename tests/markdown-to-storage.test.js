@@ -356,6 +356,14 @@ describe('convertMarkdownToStorage', () => {
     expect(convertStorageToMarkdown(storage)).toBe(markdownInput);
   });
 
+  it('does not preserve a trailing newline before nested bullet lists on import', () => {
+    const markdownInput = ['- line 1', '  - line 2', '  - line 3', ''].join('\n');
+    const storage = convertMarkdownToStorage(markdownInput);
+
+    expect(storage).toContain('<li><p>line 1</p><ul>');
+    expect(storage).not.toContain('<li><p>line 1\n</p><ul>');
+  });
+
   it('reimports markdown checklists inside raw HTML table cells as Confluence task lists', () => {
     const markdownInput = [
       '<table>',
