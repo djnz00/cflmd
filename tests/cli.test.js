@@ -1597,7 +1597,7 @@ describe('cflmd CLI', () => {
     expect(exitCode).toBe(0);
     expect(stderr.text()).toBe('');
     expect(stdout.text()).toContain(
-      `pull skipped docs/modified.md <- ${pageUrl('12345')}: local file has changed since the metadata timestamp`
+      `pull skipped docs/modified.md <- ${pageUrl('12345')}: local file has changed`
     );
     expect(stdout.text()).toContain(`pull ok docs/refresh.md <- ${pageUrl('67890')}`);
     expect(stdout.text()).toContain('pull summary: 2 processed, 1 succeeded, 0 failed, 1 skipped');
@@ -2080,7 +2080,7 @@ describe('cflmd CLI', () => {
     expect(exitCode).toBe(0);
     expect(stderr.text()).toBe('');
     expect(stdout.text()).toContain(
-      `push skipped docs/page.md -> ${pageUrl('12345')}: local file has not changed since the metadata timestamp`
+      `push skipped docs/page.md -> ${pageUrl('12345')}: local file has not changed`
     );
     expect(stdout.text()).toContain('push summary: 1 processed, 0 succeeded, 0 failed, 1 skipped');
     expect(fetchImpl).not.toHaveBeenCalled();
