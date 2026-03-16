@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { formatAtlDocument, parseAtlDocument } from '../lib/atl-document.js';
 import {
@@ -18,6 +18,7 @@ import { cliVersion } from '../lib/version.js';
 const fixturesDirectory = fileURLToPath(new URL('./fixtures/', import.meta.url));
 const storageFixturePath = join(fixturesDirectory, 'storage-roundtrip-input.atl');
 const expectedMarkdownFixturePath = join(fixturesDirectory, 'storage-roundtrip-expected.md');
+const metadataClockTime = new Date('2026-03-16T16:50:21Z');
 
 function pageUrl(pageId) {
   return `https://example.atlassian.net/wiki/spaces/ENG/pages/${pageId}/Test+Page`;
@@ -91,6 +92,15 @@ function createApiErrorResponse({
 }
 
 describe('cflmd CLI', () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(metadataClockTime);
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   it('prints abbreviated help when no command is provided', async () => {
     const stdout = createWriter();
     const stderr = createWriter();
@@ -782,7 +792,7 @@ describe('cflmd CLI', () => {
     const stdout = createWriter();
     const stderr = createWriter();
     const markdownInput = [
-      '<!-- cflmd-metadata: {"pageId":"6839074845","version":{"number":5}} -->',
+      '<!-- cflmd-metadata: {"pageId":"6839074845","version":{"number":5,"time":"2026-03-16T16:50:22Z"}} -->',
       '',
       '# Logging Pipeline',
       '',

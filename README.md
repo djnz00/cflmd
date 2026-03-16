@@ -252,7 +252,7 @@ Building standalone release binaries requires Node.js 25.5+ because `make dist` 
 Both `.atl` files and exported Markdown carry a leading metadata comment:
 
 ```html
-<!-- cflmd-metadata: {"pageId":"265021483","version":{"number":2}} -->
+<!-- cflmd-metadata: {"pageId":"265021483","version":{"number":2,"time":"2026-03-16T16:50:22Z"}} -->
 ```
 
 That metadata is used to keep conversions tied to the correct page and version.
