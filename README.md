@@ -122,7 +122,7 @@ EOF
 ./cflmd --user=you@example.com --token=... push
 ```
 
-`pull` reuses the existing `export` conversion path for each entry. `push` reuses the existing `import` direct-publish path for each entry. Both commands process entries sequentially, print one human-readable status line per entry, print a final processed/succeeded/failed summary, continue after runtime failures, and return a non-zero exit code if any entry fails.
+`pull` reuses the existing `export` conversion path for each entry. `push` reuses the existing `import` direct-publish path for each entry. Both commands process entries sequentially, print one human-readable status line per entry, print a final summary, continue after runtime failures, and return a non-zero exit code if any entry fails. When either command skips entries, the summary includes a skipped count.
 
 ### Single-Page Workflow
 
@@ -178,7 +178,7 @@ Each manifest entry behaves like:
 ./cflmd export --input='https://example.atlassian.net/wiki/spaces/ENG/pages/12345/Page' --output=docs/page.md
 ```
 
-`pull` overwrites existing files and creates new files when the file path itself does not yet exist. It does not create missing parent directories.
+`pull` overwrites existing files and creates new files when the file path itself does not yet exist. It does not create missing parent directories. If an existing Markdown file has `cflmd-metadata` with `version.time` and the file modification time is later than that timestamp, `pull` treats it as locally modified and skips that entry instead of overwriting it.
 
 ### `import`
 
@@ -226,7 +226,7 @@ Each manifest entry behaves like:
 ./cflmd import --input=docs/page.md --output='https://example.atlassian.net/wiki/spaces/ENG/pages/12345/Page'
 ```
 
-`push` only updates existing pages. It relies on the embedded `cflmd-metadata` comment in each Markdown file to verify the target page ID and version unless `--force` is used.
+`push` only updates existing pages. It relies on the embedded `cflmd-metadata` comment in each Markdown file to verify the target page ID and version unless `--force` is used. When the metadata includes `version.time`, `push` only publishes files whose filesystem modification time is later than that timestamp; otherwise the entry is skipped. `--force` bypasses that skip check. After a successful publish, `push` rewrites the local first-line metadata with the updated page version and a fresh `version.time` value so subsequent local edits can be pushed again without an intervening `pull`.
 
 ### `put`
 

@@ -76,7 +76,7 @@ describe('updateNativeDocument', () => {
         })
       );
 
-    await updateNativeDocument({
+    const result = await updateNativeDocument({
       document: formatAtlDocument({
         document: '<p>updated storage</p>',
         pageId: '12345',
@@ -86,6 +86,11 @@ describe('updateNativeDocument', () => {
       pageUrl: pageUrl('12345'),
       token: 'api-token',
       user: 'engineer@example.com'
+    });
+
+    expect(result.metadata).toEqual({
+      pageId: '12345',
+      versionNumber: 8
     });
 
     expect(fetchImpl).toHaveBeenCalledTimes(2);
