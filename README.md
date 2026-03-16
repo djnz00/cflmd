@@ -105,62 +105,6 @@ Or as global CLI options before the subcommand:
 ./cflmd --user=you@example.com --token=... get 'https://example.atlassian.net/wiki/spaces/ENG/pages/12345/Page'
 ```
 
-## Build Requirements
-
-- Node.js 18+ (ESM and `fetch` support)
-- pnpm (preferred) or npm
-
-Building standalone release binaries requires Node.js 25.5+ because `make dist` uses Node's built-in SEA builder.
-
-## Metadata Format
-
-Both `.atl` files and exported Markdown carry a leading metadata comment:
-
-```html
-<!-- cflmd-metadata: {"pageId":"265021483","version":{"number":2}} -->
-```
-
-That metadata is used to keep conversions tied to the correct page and version.
-
-Exported Markdown can also include `cflmd` HTML comments for Confluence-only constructs that Markdown cannot express directly:
-
-```html
-<!-- cflmd-toc -->
-<!-- cflmd-image: {"ac:width":"760"} -->
-<!-- cflmd-ac-link: {...} -->
-<!-- cflmd-ac-structured-macro: {...} -->
-```
-
-Plain HTML comments that do not start with `cflmd-` round-trip as Confluence `info` macros. Their comment text is interpreted as markdown content.
-
-Confluence task lists export as normal markdown checklists such as `- [ ]` and `- [x]`, and import back to `ac:task-list`.
-
-`cflmd-ac-link` and `cflmd-ac-structured-macro` comments carry encoded Confluence payloads and are often followed by the plain-text export of the same content. Keep these comments in place if you want table-of-contents macros, embedded image widths, raw `ac:link` tags, details tables, and unsupported Confluence macros to survive `export` -> edit -> `import` roundtrips. Code macros round-trip as native fenced markdown code blocks, using only the fence language. Macro parameters stay attached to their parent macro instead of being emitted or accepted in isolation.
-
-## `.cflmd` Manifest Format
-
-`pull` and `push` use a UTF-8 manifest file named `.cflmd` by default. Each non-empty, non-comment line maps one Markdown file to one Confluence page URL:
-
-```text
-docs/architecture.md: https://example.atlassian.net/wiki/spaces/ENG/pages/12345/Architecture
-docs/runbook.md: https://example.atlassian.net/wiki/spaces/OPS/pages/67890/Runbook
-```
-
-Manifest rules:
-
-- blank lines are ignored
-- lines whose first non-whitespace character is `#` are ignored
-- paths are resolved relative to the manifest file directory, not the shell working directory
-- duplicate Markdown paths are rejected before any work begins
-- duplicate Confluence page targets are rejected before any work begins
-- path fields cannot contain `:`, so Windows drive-letter absolute paths are not supported in this iteration
-
-You can override the default manifest location with:
-
-- `--manifest=FILE`
-- `--manifest FILE`
-- `-f FILE`
-
 ## Usage
 
 ### Batch Workflow
@@ -178,7 +122,7 @@ EOF
 ./cflmd --user=you@example.com --token=... push
 ```
 
-`pull` reuses the existing `export` conversion path for each entry. `push` reuses the existing `import` direct-publish path for each entry. Both commands process entries sequentially, continue after runtime failures, and return a non-zero exit code if any entry fails.
+`pull` reuses the existing `export` conversion path for each entry. `push` reuses the existing `import` direct-publish path for each entry. Both commands process entries sequentially, print one human-readable status line per entry, print a final processed/succeeded/failed summary, continue after runtime failures, and return a non-zero exit code if any entry fails.
 
 ### Single-Page Workflow
 
@@ -295,6 +239,62 @@ Publish an existing `.atl` document back to Confluence:
 ```
 
 By default, `put` checks that the embedded page ID and version match the current page. Use `--force` to override that safety check.
+
+## Build Requirements
+
+- Node.js 18+ (ESM and `fetch` support)
+- pnpm (preferred) or npm
+
+Building standalone release binaries requires Node.js 25.5+ because `make dist` uses Node's built-in SEA builder.
+
+## Metadata Format
+
+Both `.atl` files and exported Markdown carry a leading metadata comment:
+
+```html
+<!-- cflmd-metadata: {"pageId":"265021483","version":{"number":2}} -->
+```
+
+That metadata is used to keep conversions tied to the correct page and version.
+
+Exported Markdown can also include `cflmd` HTML comments for Confluence-only constructs that Markdown cannot express directly:
+
+```html
+<!-- cflmd-toc -->
+<!-- cflmd-image: {"ac:width":"760"} -->
+<!-- cflmd-ac-link: {...} -->
+<!-- cflmd-ac-structured-macro: {...} -->
+```
+
+Plain HTML comments that do not start with `cflmd-` round-trip as Confluence `info` macros. Their comment text is interpreted as markdown content.
+
+Confluence task lists export as normal markdown checklists such as `- [ ]` and `- [x]`, and import back to `ac:task-list`.
+
+`cflmd-ac-link` and `cflmd-ac-structured-macro` comments carry encoded Confluence payloads and are often followed by the plain-text export of the same content. Keep these comments in place if you want table-of-contents macros, embedded image widths, raw `ac:link` tags, details tables, and unsupported Confluence macros to survive `export` -> edit -> `import` roundtrips. Code macros round-trip as native fenced markdown code blocks, using only the fence language. Macro parameters stay attached to their parent macro instead of being emitted or accepted in isolation.
+
+## `.cflmd` Manifest Format
+
+`pull` and `push` use a UTF-8 manifest file named `.cflmd` by default. Each non-empty, non-comment line maps one Markdown file to one Confluence page URL:
+
+```text
+docs/architecture.md: https://example.atlassian.net/wiki/spaces/ENG/pages/12345/Architecture
+docs/runbook.md: https://example.atlassian.net/wiki/spaces/OPS/pages/67890/Runbook
+```
+
+Manifest rules:
+
+- blank lines are ignored
+- lines whose first non-whitespace character is `#` are ignored
+- paths are resolved relative to the manifest file directory, not the shell working directory
+- duplicate Markdown paths are rejected before any work begins
+- duplicate Confluence page targets are rejected before any work begins
+- path fields cannot contain `:`, so Windows drive-letter absolute paths are not supported in this iteration
+
+You can override the default manifest location with:
+
+- `--manifest=FILE`
+- `--manifest FILE`
+- `-f FILE`
 
 ## Development
 
