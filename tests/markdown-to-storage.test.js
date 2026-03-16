@@ -312,6 +312,35 @@ describe('convertMarkdownToStorage', () => {
     expect(roundtripped).toContain('<td>**Ready**</td>');
   });
 
+  it('ignores wrapper whitespace and supports block markdown inside raw HTML table cells', () => {
+    const markdownInput = [
+      '<table>',
+      '  <tbody>',
+      '    <tr>',
+      '      <td>',
+      '        Summary',
+      '',
+      '        - **Architecture**',
+      '        - [Runbook](https://example.com/runbook)',
+      '',
+      '        > Reviewed',
+      '      </td>',
+      '    </tr>',
+      '  </tbody>',
+      '</table>',
+      ''
+    ].join('\n');
+    const storage = convertMarkdownToStorage(markdownInput);
+
+    expect(storage).toContain('<td><p>Summary</p><ul>');
+    expect(storage).toContain('<li><p><strong>Architecture</strong></p></li>');
+    expect(storage).toContain(
+      '<li><p><a href="https://example.com/runbook">Runbook</a></p></li>'
+    );
+    expect(storage).toContain('<p style="margin-left: 30.0px;">Reviewed</p></td>');
+    expect(storage).not.toContain('<td><p></p>');
+  });
+
   it('roundtrips colgroup tags inside raw HTML tables', () => {
     const markdownInput = [
       '<table>',
