@@ -341,6 +341,29 @@ describe('convertMarkdownToStorage', () => {
     expect(storage).not.toContain('<td><p></p>');
   });
 
+  it('supports nested bullet markdown inside raw HTML table cells', () => {
+    const markdownInput = [
+      '<table>',
+      '  <tbody>',
+      '    <tr>',
+      `      <td>
+  - outer bullet
+    - inner bullet
+</td>`,
+      '    </tr>',
+      '  </tbody>',
+      '</table>',
+      ''
+    ].join('\n');
+    const storage = convertMarkdownToStorage(markdownInput);
+    const roundtripped = convertStorageToMarkdown(storage);
+
+    expect(storage).toContain('<td><ul>');
+    expect(storage).toContain('<li><p>outer bullet</p><ul>');
+    expect(storage).toContain('<li><p>inner bullet</p></li>');
+    expect(roundtripped).toContain('<td><ul><li>outer bullet<ul><li>inner bullet</li></ul></li></ul></td>');
+  });
+
   it('roundtrips colgroup tags inside raw HTML tables', () => {
     const markdownInput = [
       '<table>',
