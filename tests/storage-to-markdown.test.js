@@ -155,6 +155,15 @@ describe('convertStorageToMarkdown', () => {
     expect(converted).toContain('<td>**Ready**</td>');
   });
 
+  it('exports block markdown inside raw HTML table cells as markdown instead of nested html', () => {
+    const converted = convertStorageToMarkdown(
+      '<table><tbody><tr><td><p>foo</p><ul><li><p>bar</p><ul><li><p>baz</p></li></ul></li></ul></td></tr></tbody></table>'
+    );
+
+    expect(converted).toContain('<td>\n        foo\n        - bar\n            - baz\n      </td>');
+    expect(converted).not.toContain('<td>foo<ul>');
+  });
+
   it('exports colgroup tags inside raw HTML tables', () => {
     const converted = convertStorageToMarkdown(
       '<table><colgroup><col style="width: 30%;" /><col style="width: 70%;" /></colgroup><tbody><tr><td><p>alpha</p></td><td><p>beta</p></td></tr></tbody></table>'
@@ -214,7 +223,9 @@ describe('convertStorageToMarkdown', () => {
     expect(converted).not.toContain('<!-- cflmd-ac-parameter:');
     expect(converted).toContain('<td>- [ ] <!-- cflmd-ac-link:');
     expect(converted).toContain('<!-- cflmd-ac-link:');
-    expect(converted).toContain('<ul>');
+    expect(converted).toContain('Supporting documents');
+    expect(converted).toContain('- <!-- cflmd-ac-structured-macro:');
+    expect(converted).not.toContain('<ul>');
     expect(converted).toContain('OPS-42');
     expect(converted).toContain('<!-- cflmd-toc -->');
   });
