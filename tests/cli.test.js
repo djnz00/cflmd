@@ -1,10 +1,10 @@
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { formatAtlDocument, parseAtlDocument } from '../lib/atl-document.js';
 import {
@@ -18,6 +18,7 @@ import { cliVersion } from '../lib/version.js';
 const fixturesDirectory = fileURLToPath(new URL('./fixtures/', import.meta.url));
 const storageFixturePath = join(fixturesDirectory, 'storage-roundtrip-input.atl');
 const expectedMarkdownFixturePath = join(fixturesDirectory, 'storage-roundtrip-expected.md');
+const metadataClockTime = new Date('2026-03-16T16:50:21Z');
 
 function pageUrl(pageId) {
   return `https://example.atlassian.net/wiki/spaces/ENG/pages/${pageId}/Test+Page`;
@@ -91,6 +92,15 @@ function createApiErrorResponse({
 }
 
 describe('cflmd CLI', () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(metadataClockTime);
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   it('prints abbreviated help when no command is provided', async () => {
     const stdout = createWriter();
     const stderr = createWriter();
@@ -782,7 +792,7 @@ describe('cflmd CLI', () => {
     const stdout = createWriter();
     const stderr = createWriter();
     const markdownInput = [
-      '<!-- cflmd-metadata: {"pageId":"6839074845","version":{"number":5}} -->',
+      '<!-- cflmd-metadata: {"pageId":"6839074845","version":{"number":5,"time":"2026-03-16T16:50:22Z"}} -->',
       '',
       '# Logging Pipeline',
       '',
@@ -1534,6 +1544,74 @@ describe('cflmd CLI', () => {
     );
   });
 
+  it('skips locally modified markdown files during pull and refreshes unmodified ones', async () => {
+    const stdout = createWriter();
+    const stderr = createWriter();
+    const tempDir = await mkdtemp(join(tmpdir(), 'cflmd-cli-'));
+    const modifiedPath = join(tempDir, 'docs', 'modified.md');
+    const refreshPath = join(tempDir, 'docs', 'refresh.md');
+    const remoteDocument = '<p>Example storage body</p>';
+    const localModifiedMarkdown = formatMarkdownDocument({
+      markdown: '# Modified locally\n',
+      pageId: '12345',
+      versionNumber: 7
+    });
+    const localRefreshMarkdown = formatMarkdownDocument({
+      markdown: '# Refresh me\n',
+      pageId: '67890',
+      versionNumber: 3
+    });
+    const modifiedTime = new Date('2026-03-16T16:50:23Z');
+    const unmodifiedTime = new Date('2026-03-16T16:50:21Z');
+
+    await mkdir(join(tempDir, 'docs'), { recursive: true });
+    await writeFile(modifiedPath, localModifiedMarkdown);
+    await writeFile(refreshPath, localRefreshMarkdown);
+    await utimes(modifiedPath, modifiedTime, modifiedTime);
+    await utimes(refreshPath, unmodifiedTime, unmodifiedTime);
+    await writeFile(
+      join(tempDir, '.cflmd'),
+      [
+        `docs/modified.md: ${pageUrl('12345')}`,
+        `docs/refresh.md: ${pageUrl('67890')}`
+      ].join('\n')
+    );
+
+    const fetchImpl = vi.fn().mockResolvedValue(
+      createPageResponse({
+        document: remoteDocument,
+        pageId: '67890',
+        versionNumber: 4
+      })
+    );
+
+    const exitCode = await main({
+      argv: ['--user=engineer@example.com', '--token=env-token', 'pull'],
+      cwd: tempDir,
+      env: {},
+      fetchImpl,
+      stderr: stderr.writer,
+      stdout: stdout.writer
+    });
+
+    expect(exitCode).toBe(0);
+    expect(stderr.text()).toBe('');
+    expect(stdout.text()).toContain(
+      `pull skipped docs/modified.md <- ${pageUrl('12345')}: local file has changed since the metadata timestamp`
+    );
+    expect(stdout.text()).toContain(`pull ok docs/refresh.md <- ${pageUrl('67890')}`);
+    expect(stdout.text()).toContain('pull summary: 2 processed, 1 succeeded, 0 failed, 1 skipped');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    await expect(readFile(modifiedPath, 'utf8')).resolves.toBe(localModifiedMarkdown);
+    await expect(readFile(refreshPath, 'utf8')).resolves.toBe(
+      formatMarkdownDocument({
+        markdown: convertStorageToMarkdown(remoteDocument),
+        pageId: '67890',
+        versionNumber: 4
+      })
+    );
+  });
+
   it('pushes markdown files from a manifest override', async () => {
     const stdout = createWriter();
     const stderr = createWriter();
@@ -1608,6 +1686,22 @@ describe('cflmd CLI', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(4);
     expect(fetchImpl.mock.calls[1][0].href).toBe('https://example.atlassian.net/wiki/api/v2/pages/12345');
     expect(fetchImpl.mock.calls[3][0].href).toBe('https://example.atlassian.net/wiki/api/v2/pages/67890');
+    await expect(readFile(join(docsDirectory, 'one.md'), 'utf8')).resolves.toBe(
+      formatMarkdownDocument({
+        markdown: '# One\n',
+        pageId: '12345',
+        versionNumber: 8,
+        versionTime: '2026-03-16T16:50:22Z'
+      })
+    );
+    await expect(readFile(join(docsDirectory, 'two.md'), 'utf8')).resolves.toBe(
+      formatMarkdownDocument({
+        markdown: '# Two\n',
+        pageId: '67890',
+        versionNumber: 4,
+        versionTime: '2026-03-16T16:50:22Z'
+      })
+    );
   });
 
   it('fails cleanly when push is missing Atlassian credentials', async () => {
@@ -1936,6 +2030,106 @@ describe('cflmd CLI', () => {
     expect(stdout.text()).toContain(`push ok docs/mismatch.md -> ${pageUrl('67890')}`);
     expect(stdout.text()).toContain('push summary: 2 processed, 2 succeeded, 0 failed');
     expect(fetchImpl).toHaveBeenCalledTimes(4);
+    await expect(readFile(join(tempDir, 'docs', 'no-meta.md'), 'utf8')).resolves.toBe(
+      formatMarkdownDocument({
+        markdown: '# No Metadata\n',
+        pageId: '12345',
+        versionNumber: 5,
+        versionTime: '2026-03-16T16:50:22Z'
+      })
+    );
+    await expect(readFile(join(tempDir, 'docs', 'mismatch.md'), 'utf8')).resolves.toBe(
+      formatMarkdownDocument({
+        markdown: '# Mismatch\n',
+        pageId: '67890',
+        versionNumber: 7,
+        versionTime: '2026-03-16T16:50:22Z'
+      })
+    );
+  });
+
+  it('skips push entries whose file mtime is not later than the metadata timestamp', async () => {
+    const stdout = createWriter();
+    const stderr = createWriter();
+    const tempDir = await mkdtemp(join(tmpdir(), 'cflmd-cli-'));
+    const markdownPath = join(tempDir, 'docs', 'page.md');
+    const timestampBeforeMetadata = new Date('2026-03-16T16:50:21Z');
+
+    await mkdir(join(tempDir, 'docs'), { recursive: true });
+    await writeFile(
+      markdownPath,
+      formatMarkdownDocument({
+        markdown: '# Page\n',
+        pageId: '12345',
+        versionNumber: 7
+      })
+    );
+    await utimes(markdownPath, timestampBeforeMetadata, timestampBeforeMetadata);
+    await writeFile(join(tempDir, '.cflmd'), `docs/page.md: ${pageUrl('12345')}\n`);
+
+    const fetchImpl = vi.fn();
+    const exitCode = await main({
+      argv: ['--user=engineer@example.com', '--token=env-token', 'push'],
+      cwd: tempDir,
+      env: {},
+      fetchImpl,
+      stderr: stderr.writer,
+      stdout: stdout.writer
+    });
+
+    expect(exitCode).toBe(0);
+    expect(stderr.text()).toBe('');
+    expect(stdout.text()).toContain(
+      `push skipped docs/page.md -> ${pageUrl('12345')}: local file has not changed since the metadata timestamp`
+    );
+    expect(stdout.text()).toContain('push summary: 1 processed, 0 succeeded, 0 failed, 1 skipped');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('pushes unchanged markdown files when --force is used', async () => {
+    const stdout = createWriter();
+    const stderr = createWriter();
+    const tempDir = await mkdtemp(join(tmpdir(), 'cflmd-cli-'));
+    const markdownPath = join(tempDir, 'docs', 'page.md');
+    const timestampBeforeMetadata = new Date('2026-03-16T16:50:21Z');
+
+    await mkdir(join(tempDir, 'docs'), { recursive: true });
+    await writeFile(
+      markdownPath,
+      formatMarkdownDocument({
+        markdown: '# Page\n',
+        pageId: '12345',
+        versionNumber: 7
+      })
+    );
+    await utimes(markdownPath, timestampBeforeMetadata, timestampBeforeMetadata);
+    await writeFile(join(tempDir, '.cflmd'), `docs/page.md: ${pageUrl('12345')}\n`);
+
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        createPageResponse({
+          document: '<p>old page</p>',
+          pageId: '12345',
+          versionNumber: 7
+        })
+      )
+      .mockResolvedValueOnce(createPageUpdateResponse('12345'));
+
+    const exitCode = await main({
+      argv: ['--user=engineer@example.com', '--token=env-token', 'push', '--force'],
+      cwd: tempDir,
+      env: {},
+      fetchImpl,
+      stderr: stderr.writer,
+      stdout: stdout.writer
+    });
+
+    expect(exitCode).toBe(0);
+    expect(stderr.text()).toBe('');
+    expect(stdout.text()).toContain(`push ok docs/page.md -> ${pageUrl('12345')}`);
+    expect(stdout.text()).toContain('push summary: 1 processed, 1 succeeded, 0 failed');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
   it('continues push after a remote API failure and returns a non-zero exit code', async () => {

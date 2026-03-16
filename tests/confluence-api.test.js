@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { formatAtlDocument } from '../lib/atl-document.js';
 import {
@@ -10,6 +10,17 @@ import {
 function pageUrl(pageId) {
   return `https://example.atlassian.net/wiki/spaces/ENG/pages/${pageId}/Test+Page`;
 }
+
+const metadataClockTime = new Date('2026-03-16T16:50:21Z');
+
+beforeAll(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(metadataClockTime);
+});
+
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 describe('resolvePageEndpoint', () => {
   it('builds the v2 endpoint from a standard Confluence Cloud page URL', () => {
@@ -65,7 +76,7 @@ describe('updateNativeDocument', () => {
         })
       );
 
-    await updateNativeDocument({
+    const result = await updateNativeDocument({
       document: formatAtlDocument({
         document: '<p>updated storage</p>',
         pageId: '12345',
@@ -75,6 +86,11 @@ describe('updateNativeDocument', () => {
       pageUrl: pageUrl('12345'),
       token: 'api-token',
       user: 'engineer@example.com'
+    });
+
+    expect(result.metadata).toEqual({
+      pageId: '12345',
+      versionNumber: 8
     });
 
     expect(fetchImpl).toHaveBeenCalledTimes(2);
@@ -179,7 +195,8 @@ describe('fetchAtlDocument', () => {
 
     expect(result.metadata).toEqual({
       pageId: '12345',
-      versionNumber: 9
+      versionNumber: 9,
+      versionTime: '2026-03-16T16:50:22Z'
     });
     expect(result.atl).toBe(
       formatAtlDocument({

@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { parseAtlDocument } from '../lib/atl-document.js';
+import { formatAtlDocument, parseAtlDocument } from '../lib/atl-document.js';
 import {
   formatMarkdownDocument,
   parseMarkdownDocument
@@ -16,8 +16,18 @@ const fixturesDirectory = fileURLToPath(new URL('./fixtures/', import.meta.url))
 const inputFixturePath = join(fixturesDirectory, 'storage-roundtrip-expected.md');
 const linkedAttachmentHref = 'https://example.com/diagrams/release-architecture';
 const linkedAttachmentFilename = 'release-architecture-overview.jpg';
+const metadataClockTime = new Date('2026-03-16T16:50:21Z');
 
 describe('convertMarkdownToStorage', () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(metadataClockTime);
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   it('roundtrips the exported markdown fixture back into stable markdown', () => {
     const markdownInput = readFileSync(inputFixturePath, 'utf8');
     const { markdown, metadata } = parseMarkdownDocument(markdownInput);
@@ -37,7 +47,12 @@ describe('convertMarkdownToStorage', () => {
     const markdownInput = readFileSync(inputFixturePath, 'utf8');
     const { markdown, metadata } = parseMarkdownDocument(markdownInput);
     const storage = convertMarkdownToStorage(markdown);
-    const atl = `<!-- cflmd-metadata: {"pageId":"${metadata.pageId}","version":{"number":${metadata.versionNumber}}} -->\n${storage}`;
+    const atl = formatAtlDocument({
+      document: storage,
+      pageId: metadata.pageId,
+      versionNumber: metadata.versionNumber,
+      versionTime: metadata.versionTime
+    });
     const parsed = parseAtlDocument(atl);
 
     expect(parsed.metadata).toEqual(metadata);
