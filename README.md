@@ -137,9 +137,50 @@ Confluence task lists export as normal markdown checklists such as `- [ ]` and `
 
 `cflmd-ac-link` and `cflmd-ac-structured-macro` comments carry encoded Confluence payloads and are often followed by the plain-text export of the same content. Keep these comments in place if you want table-of-contents macros, embedded image widths, raw `ac:link` tags, details tables, and unsupported Confluence macros to survive `export` -> edit -> `import` roundtrips. Code macros round-trip as native fenced markdown code blocks, using only the fence language. Macro parameters stay attached to their parent macro instead of being emitted or accepted in isolation.
 
+## `.cflmd` Manifest Format
+
+`pull` and `push` use a UTF-8 manifest file named `.cflmd` by default. Each non-empty, non-comment line maps one Markdown file to one Confluence page URL:
+
+```text
+docs/architecture.md: https://example.atlassian.net/wiki/spaces/ENG/pages/12345/Architecture
+docs/runbook.md: https://example.atlassian.net/wiki/spaces/OPS/pages/67890/Runbook
+```
+
+Manifest rules:
+
+- blank lines are ignored
+- lines whose first non-whitespace character is `#` are ignored
+- paths are resolved relative to the manifest file directory, not the shell working directory
+- duplicate Markdown paths are rejected before any work begins
+- duplicate Confluence page targets are rejected before any work begins
+- path fields cannot contain `:`, so Windows drive-letter absolute paths are not supported in this iteration
+
+You can override the default manifest location with:
+
+- `--manifest=FILE`
+- `--manifest FILE`
+- `-f FILE`
+
 ## Usage
 
-### Typical Workflow
+### Batch Workflow
+
+Use `pull` to refresh a set of Markdown files from Confluence, edit them locally, then use `push` to publish them back:
+
+```bash
+cat > .cflmd <<'EOF'
+docs/page-one.md: https://example.atlassian.net/wiki/spaces/ENG/pages/12345/Page+One
+docs/page-two.md: https://example.atlassian.net/wiki/spaces/ENG/pages/67890/Page+Two
+EOF
+
+./cflmd --user=you@example.com --token=... pull
+# edit docs/page-one.md and docs/page-two.md
+./cflmd --user=you@example.com --token=... push
+```
+
+`pull` reuses the existing `export` conversion path for each entry. `push` reuses the existing `import` direct-publish path for each entry. Both commands process entries sequentially, continue after runtime failures, and return a non-zero exit code if any entry fails.
+
+### Single-Page Workflow
 
 ```bash
 ./cflmd export -i 'https://example.atlassian.net/wiki/spaces/ENG/pages/12345/Page' -o page.md
@@ -173,6 +214,28 @@ You can also fetch from Confluence and export directly:
 
 If `--input` is omitted, `export` reads `.atl` from stdin.
 
+### `pull`
+
+Refresh Markdown files from a manifest:
+
+```bash
+./cflmd --user=you@example.com --token=... pull
+```
+
+Use a different manifest file:
+
+```bash
+./cflmd --user=you@example.com --token=... pull --manifest=docs/team-pages.cflmd
+```
+
+Each manifest entry behaves like:
+
+```bash
+./cflmd export --input='https://example.atlassian.net/wiki/spaces/ENG/pages/12345/Page' --output=docs/page.md
+```
+
+`pull` overwrites existing files and creates new files when the file path itself does not yet exist. It does not create missing parent directories.
+
 ### `import`
 
 Convert Markdown to `.atl`:
@@ -192,6 +255,34 @@ If `--input` is omitted, `import` reads Markdown from stdin.
 ```
 
 Direct publish normally requires valid page metadata in the Markdown header so the page ID and version can be verified. Use `--force` to publish anyway.
+
+### `push`
+
+Publish Markdown files from a manifest:
+
+```bash
+./cflmd --user=you@example.com --token=... push
+```
+
+Use a different manifest file:
+
+```bash
+./cflmd --user=you@example.com --token=... push -f docs/team-pages.cflmd
+```
+
+Publish even when some entries have missing or mismatched metadata:
+
+```bash
+./cflmd --user=you@example.com --token=... push --force
+```
+
+Each manifest entry behaves like:
+
+```bash
+./cflmd import --input=docs/page.md --output='https://example.atlassian.net/wiki/spaces/ENG/pages/12345/Page'
+```
+
+`push` only updates existing pages. It relies on the embedded `cflmd-metadata` comment in each Markdown file to verify the target page ID and version unless `--force` is used.
 
 ### `put`
 
