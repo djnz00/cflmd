@@ -331,6 +331,7 @@ describe('convertMarkdownToStorage', () => {
       ''
     ].join('\n');
     const storage = convertMarkdownToStorage(markdownInput);
+    const roundtripped = convertStorageToMarkdown(storage);
 
     expect(storage).toContain('<td><p>Summary</p><ul>');
     expect(storage).toContain('<li><p><strong>Architecture</strong></p></li>');
@@ -339,6 +340,10 @@ describe('convertMarkdownToStorage', () => {
     );
     expect(storage).toContain('<p style="margin-left: 30.0px;">Reviewed</p></td>');
     expect(storage).not.toContain('<td><p></p>');
+    expect(roundtripped).toContain('- **Architecture**');
+    expect(roundtripped).toContain('- [Runbook](https://example.com/runbook)');
+    expect(roundtripped).toContain('> Reviewed');
+    expect(roundtripped).not.toContain('<ul>');
   });
 
   it('supports nested bullet markdown inside raw HTML table cells', () => {
@@ -361,7 +366,10 @@ describe('convertMarkdownToStorage', () => {
     expect(storage).toContain('<td><ul>');
     expect(storage).toContain('<li><p>outer bullet</p><ul>');
     expect(storage).toContain('<li><p>inner bullet</p></li>');
-    expect(roundtripped).toContain('<td><ul><li>outer bullet<ul><li>inner bullet</li></ul></li></ul></td>');
+    expect(roundtripped).toContain(
+      '<td>\n        - outer bullet\n            - inner bullet\n      </td>'
+    );
+    expect(roundtripped).not.toContain('<ul>');
   });
 
   it('roundtrips colgroup tags inside raw HTML tables', () => {
