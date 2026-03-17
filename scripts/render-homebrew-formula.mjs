@@ -4,7 +4,7 @@ const options = parseArgs(process.argv.slice(2));
 const manifest = JSON.parse(await readFile(options.manifest, 'utf8'));
 const repo = options.repo;
 const homepage = `https://github.com/${repo}`;
-const license = options.license ?? 'ISC';
+const license = options.license ?? 'MIT';
 
 const linux = requireArtifact(manifest, 'linux-x64');
 const macosX64 = requireArtifact(manifest, 'macos-x64');
