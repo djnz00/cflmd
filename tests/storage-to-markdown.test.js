@@ -164,6 +164,15 @@ describe('convertStorageToMarkdown', () => {
     expect(converted).not.toContain('<td>foo<ul>');
   });
 
+  it('normalizes single-item markdown list spacing inside raw HTML table cells', () => {
+    const converted = convertStorageToMarkdown(
+      '<table><tbody><tr><td><ul><li><p>TBD</p></li></ul></td></tr></tbody></table>'
+    );
+
+    expect(converted).toContain('<td>- TBD</td>');
+    expect(converted).not.toContain('<td>-   TBD</td>');
+  });
+
   it('exports colgroup tags inside raw HTML tables', () => {
     const converted = convertStorageToMarkdown(
       '<table><colgroup><col style="width: 30%;" /><col style="width: 70%;" /></colgroup><tbody><tr><td><p>alpha</p></td><td><p>beta</p></td></tr></tbody></table>'
