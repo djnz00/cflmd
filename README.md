@@ -1,8 +1,12 @@
 # cflmd
 
-`cflmd` is a command line tool for editing Confluence pages in Markdown. Releases are available via GitHub Releases, Homebrew, and standalone binaries for Linux and MacOS.
+[![CI](https://github.com/djnz00/cflmd/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/djnz00/cflmd/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/djnz00/cflmd)](https://github.com/djnz00/cflmd/releases/latest)
+[![Homebrew](https://img.shields.io/badge/Homebrew-djnz00%2Fcflmd-fbb040?logo=homebrew)](https://github.com/djnz00/homebrew-cflmd)
+[![Node >=18](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://github.com/djnz00/cflmd/blob/main/package.json)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/djnz00/cflmd/blob/main/LICENSE)
 
-[Latest releases](https://github.com/djnz00/cflmd/releases/latest)
+`cflmd` is a command line tool for editing Confluence pages in Markdown. Releases are available via GitHub Releases, Homebrew, and standalone binaries for Linux and MacOS.
 
 `cflmd` can:
 
