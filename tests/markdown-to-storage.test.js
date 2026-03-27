@@ -222,6 +222,61 @@ describe('convertMarkdownToStorage', () => {
     expect(convertStorageToMarkdown(storage)).toBe(markdownInput);
   });
 
+
+  it('reimports centered markdown-native pipe table columns as centered paragraphs', () => {
+    const markdownInput = [
+      '| **Priority** | **Status** | **Item** |',
+      '| :---: | :---: | --- |',
+      '| H | M | alpha |',
+      '| M | L | beta |',
+      ''
+    ].join('\n');
+    const storage = convertMarkdownToStorage(markdownInput);
+
+    expect(storage).toContain('<th><p style="text-align: center;"><strong>Priority</strong></p></th>');
+    expect(storage).toContain('<th><p style="text-align: center;"><strong>Status</strong></p></th>');
+    expect(storage).toContain('<td><p style="text-align: center;">H</p></td>');
+    expect(storage).toContain('<td><p style="text-align: center;">M</p></td>');
+    expect(storage).not.toContain('<td style="text-align:center">');
+    expect(convertStorageToMarkdown(storage)).toBe(markdownInput);
+  });
+
+  it('moves raw HTML table cell alignment styles onto inner paragraphs', () => {
+    const markdownInput = [
+      '<table>',
+      '  <colgroup>',
+      '    <col style="width: 10%;">',
+      '    <col style="width: 20%;">',
+      '  </colgroup>',
+      '  <tbody>',
+      '    <tr>',
+      '      <th style="text-align:center">Priority</th>',
+      '      <th>Item</th>',
+      '    </tr>',
+      '    <tr>',
+      '      <td style="text-align:center">H</td>',
+      '      <td>alpha</td>',
+      '    </tr>',
+      '  </tbody>',
+      '</table>',
+      ''
+    ].join('\n');
+    const storage = convertMarkdownToStorage(markdownInput);
+
+    expect(storage).toContain('<colgroup><col style="width: 10%;" /><col style="width: 20%;" /></colgroup>');
+    expect(storage).toContain('<th><p style="text-align: center;"><strong>Priority</strong></p></th>');
+    expect(storage).toContain('<td><p style="text-align: center;">H</p></td>');
+    expect(storage).not.toContain('<th style="text-align:center">');
+    expect(storage).not.toContain('<td style="text-align:center">');
+
+    const roundtripped = convertStorageToMarkdown(storage);
+
+    expect(roundtripped).toContain('  <colgroup>');
+    expect(roundtripped).toContain('<th style="text-align:center">**Priority**</th>');
+    expect(roundtripped).toContain('<td style="text-align:center">H</td>');
+    expect(roundtripped).toContain('  <thead>');
+  });
+
   it('ignores legacy preserved code parameter comments before fenced code blocks', () => {
     const markdownInput = [
       '<!-- cflmd-ac-parameter: {"block":true,"context":"code","text":"","markup":"PGFjOnBhcmFtZXRlciBhYzpuYW1lPSJsYW5ndWFnZSI+anNvbjwvYWM6cGFyYW1ldGVyPg=="} -->',
