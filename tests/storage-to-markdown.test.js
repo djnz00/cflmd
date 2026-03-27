@@ -184,6 +184,34 @@ describe('convertStorageToMarkdown', () => {
     expect(converted).not.toContain('<table>');
   });
 
+
+  it('exports centered simple table columns as markdown alignment markers', () => {
+    const converted = convertStorageToMarkdown(
+      '<table><tbody><tr><th><p style="text-align: center;"><strong>Priority</strong></p></th><th><p style="text-align: center;"><strong>Status</strong></p></th><th><p><strong>Item</strong></p></th></tr><tr><td><p style="text-align: center;">H</p></td><td><p style="text-align: center;">M</p></td><td><p>alpha</p></td></tr><tr><td><p style="text-align: center;">M</p></td><td><p style="text-align: center;">L</p></td><td><p>beta</p></td></tr></tbody></table>'
+    );
+
+    expect(converted).toBe(
+      [
+        '| **Priority** | **Status** | **Item** |',
+        '| :---: | :---: | --- |',
+        '| H | M | alpha |',
+        '| M | L | beta |',
+        ''
+      ].join('\n')
+    );
+  });
+
+  it('preserves centered cell alignment in raw HTML table fallback output', () => {
+    const converted = convertStorageToMarkdown(
+      '<table><colgroup><col style="width: 10%;" /><col style="width: 20%;" /></colgroup><tbody><tr><th><p style="text-align: center;"><strong>Priority</strong></p></th><th><p><strong>Item</strong></p></th></tr><tr><td><p style="text-align: center;">H</p></td><td><p>alpha</p></td></tr></tbody></table>'
+    );
+
+    expect(converted).toContain('  <colgroup>');
+    expect(converted).toContain('<th style="text-align:center">**Priority**</th>');
+    expect(converted).toContain('<td style="text-align:center">H</td>');
+    expect(converted).toContain('<td>alpha</td>');
+  });
+
   it('normalizes single-item markdown list spacing inside raw HTML table cells', () => {
     const converted = convertStorageToMarkdown(
       '<table><tbody><tr><td><ul><li><p>TBD</p></li></ul></td></tr></tbody></table>'
