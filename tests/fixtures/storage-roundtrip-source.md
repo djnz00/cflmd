@@ -82,31 +82,10 @@ Escaped punctuation should stay literal: \*asterisks\*, \[brackets\], \#hash, an
 
 ---
 
-## HTML Table
+## Markdown Table
 
-<table>
-  <thead>
-    <tr>
-      <th>Column</th>
-      <th>Value</th>
-      <th>Notes</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>alpha</td>
-      <td>1</td>
-      <td>plain text cell</td>
-    </tr>
-    <tr>
-      <td>beta</td>
-      <td>2</td>
-      <td>contains &amp; entity</td>
-    </tr>
-    <tr>
-      <td>gamma</td>
-      <td>3</td>
-      <td><code>inline html code</code></td>
-    </tr>
-  </tbody>
-</table>
+| **Column** | **Value** | **Notes** |
+| --- | --- | --- |
+| alpha | 1 | plain text cell |
+| beta | 2 | contains & entity |
+| gamma | 3 | `inline html code` |
