@@ -45,7 +45,9 @@ describe('convertStorageToMarkdown', () => {
     expect(converted).toContain('![Standard markdown image](images/standard-image.png)');
     expect(converted).toContain('Autolink: <https://www.example.org/docs>');
     expect(converted).toContain('```json');
-    expect(converted).toContain('<table>');
+    expect(converted).toContain('| **Column** | **Value** | **Notes** |');
+    expect(converted).toContain('| gamma | 3 | `inline html code` |');
+    expect(converted).not.toContain('<table>');
   });
 
   it('exports attachment images with ac:width as a preceding HTML comment', () => {
@@ -162,6 +164,24 @@ describe('convertStorageToMarkdown', () => {
 
     expect(converted).toContain('<td>\n        foo\n        - bar\n            - baz\n      </td>');
     expect(converted).not.toContain('<td>foo<ul>');
+  });
+
+  it('exports simple Confluence tables as markdown-native pipe tables', () => {
+    const converted = convertStorageToMarkdown(
+      '<table><tbody><tr><th><p><strong>Column</strong></p></th><th><p><strong>Value</strong></p></th><th><p><strong>Notes</strong></p></th></tr><tr><td><p>alpha</p></td><td><p>1</p></td><td><p>plain text cell</p></td></tr><tr><td><p>beta</p></td><td><p>2</p></td><td><p>contains &amp; entity</p></td></tr><tr><td><p>gamma</p></td><td><p>3</p></td><td><p><code>inline html code</code></p></td></tr></tbody></table>'
+    );
+
+    expect(converted).toBe(
+      [
+        '| **Column** | **Value** | **Notes** |',
+        '| --- | --- | --- |',
+        '| alpha | 1 | plain text cell |',
+        '| beta | 2 | contains & entity |',
+        '| gamma | 3 | `inline html code` |',
+        ''
+      ].join('\n')
+    );
+    expect(converted).not.toContain('<table>');
   });
 
   it('normalizes single-item markdown list spacing inside raw HTML table cells', () => {

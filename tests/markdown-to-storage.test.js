@@ -202,6 +202,26 @@ describe('convertMarkdownToStorage', () => {
     expect(convertStorageToMarkdown(storage)).toBe(markdownInput);
   });
 
+  it('reimports markdown-native pipe tables as Confluence tables', () => {
+    const markdownInput = [
+      '| **Column** | **Value** | **Notes** |',
+      '| --- | --- | --- |',
+      '| alpha | 1 | plain text cell |',
+      '| beta | 2 | contains & entity |',
+      '| gamma | 3 | `inline html code` |',
+      ''
+    ].join('\n');
+    const storage = convertMarkdownToStorage(markdownInput);
+
+    expect(storage).toContain('<table data-layout="default" data-table-width="760">');
+    expect(storage).toContain('<thead>');
+    expect(storage).toContain('<th><p><strong>Column</strong></p></th>');
+    expect(storage).toContain('<th><p><strong>Notes</strong></p></th>');
+    expect(storage).toContain('<td><p>contains &amp; entity</p></td>');
+    expect(storage).toContain('<td><p><code>inline html code</code></p></td>');
+    expect(convertStorageToMarkdown(storage)).toBe(markdownInput);
+  });
+
   it('ignores legacy preserved code parameter comments before fenced code blocks', () => {
     const markdownInput = [
       '<!-- cflmd-ac-parameter: {"block":true,"context":"code","text":"","markup":"PGFjOnBhcmFtZXRlciBhYzpuYW1lPSJsYW5ndWFnZSI+anNvbjwvYWM6cGFyYW1ldGVyPg=="} -->',
