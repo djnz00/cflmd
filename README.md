@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/djnz00/cflmd/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/djnz00/cflmd/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/djnz00/cflmd)](https://github.com/djnz00/cflmd/releases/latest)
-[![Homebrew](https://img.shields.io/badge/Homebrew-djnz00%2Fcflmd-fbb040?logo=homebrew)](https://github.com/djnz00/homebrew-cflmd)
+[![Homebrew](https://img.shields.io/badge/Homebrew-djnz00%2Fdjnz00-fbb040?logo=homebrew)](https://github.com/djnz00/homebrew-djnz00)
 [![Node >=18](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://github.com/djnz00/cflmd/blob/main/package.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/djnz00/cflmd/blob/main/LICENSE)
 
@@ -27,8 +27,11 @@ Most modern markdown features are supported, including html tables. Mermaid diag
 ### Homebrew
 
 ```bash
-brew install djnz00/cflmd/cflmd
+brew tap djnz00/djnz00
+brew install cflmd
 ```
+
+Or install directly with `brew install djnz00/djnz00/cflmd`.
 
 ### npm
 

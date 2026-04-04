@@ -57,12 +57,13 @@ That package layout is controlled in [package.json](../package.json).
 
 ## Homebrew Tap
 
-The Homebrew tap lives in a separate repository, typically named something like `your-org/homebrew-cflmd`.
+The Homebrew tap lives in a separate repository, typically named something like `your-org/homebrew-djnz00`.
+That shared tap can host multiple formulae; `cflmd` is one formula in it.
 
 Set that tap repository up once with:
 
 ```bash
-brew tap-new your-org/cflmd
+brew tap-new your-org/djnz00
 ```
 
 Keep the default workflows that `brew tap-new` creates so the tap can build and publish bottles from formula updates.
@@ -72,6 +73,7 @@ This repository can then update the tap automatically through [`.github/workflow
 Required repository variable:
 
 - `HOMEBREW_TAP_REPO`
+  Set this to the full tap repository name, for example `djnz00/homebrew-djnz00`.
 
 Required secret:
 
