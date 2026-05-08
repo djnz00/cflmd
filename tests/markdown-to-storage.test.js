@@ -197,9 +197,31 @@ describe('convertMarkdownToStorage', () => {
     expect(storage).toContain('<ac:parameter ac:name="breakoutMode">wide</ac:parameter>');
     expect(storage).toContain('<ac:parameter ac:name="breakoutWidth">760</ac:parameter>');
     expect(storage).toContain(
-      '<ac:plain-text-body><![CDATA[message ReleaseCheck {\n  bool ready = 1;\n}\n]]></ac:plain-text-body>'
+      '<ac:plain-text-body><![CDATA[message ReleaseCheck {\n  bool ready = 1;\n}]]></ac:plain-text-body>'
     );
     expect(convertStorageToMarkdown(storage)).toBe(markdownInput);
+  });
+
+  it('does not add trailing blank lines to text fenced code blocks in storage', () => {
+    const markdownInput = ['```text', 'plain text', '```', ''].join('\n');
+    const storage = convertMarkdownToStorage(markdownInput);
+
+    expect(storage).toContain('<ac:parameter ac:name="language">text</ac:parameter>');
+    expect(storage).toContain(
+      '<ac:plain-text-body><![CDATA[plain text]]></ac:plain-text-body>'
+    );
+    expect(storage).not.toContain('plain text\n]]>');
+    expect(convertStorageToMarkdown(storage)).toBe(markdownInput);
+  });
+
+  it('preserves intentional trailing blank lines in fenced code block storage', () => {
+    const markdownInput = ['```text', 'plain text', '', '```', ''].join('\n');
+    const storage = convertMarkdownToStorage(markdownInput);
+
+    expect(storage).toContain(
+      '<ac:plain-text-body><![CDATA[plain text\n]]></ac:plain-text-body>'
+    );
+    expect(storage).not.toContain('plain text\n\n]]>');
   });
 
   it('reimports markdown-native pipe tables as Confluence tables', () => {
@@ -297,7 +319,7 @@ describe('convertMarkdownToStorage', () => {
     expect(storage).toContain('<ac:parameter ac:name="breakoutWidth">760</ac:parameter>');
     expect(storage).not.toContain('<ac:parameter ac:name="breakoutWidth">1011</ac:parameter>');
     expect(storage).toContain(
-      '<ac:plain-text-body><![CDATA[{"ready":true}\n]]></ac:plain-text-body>'
+      '<ac:plain-text-body><![CDATA[{"ready":true}]]></ac:plain-text-body>'
     );
     expect(convertStorageToMarkdown(storage)).toBe('```json\n{"ready":true}\n```\n');
   });
