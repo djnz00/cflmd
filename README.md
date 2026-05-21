@@ -10,11 +10,11 @@
 
 `cflmd` can:
 
-- download Confluence pages as `.atl`
-  - `.atl` is an invented file extension for Confluence's native document storage format, sometimes referred to as "atlas" in Confluence's documentation. `.atl` is a dialect of html.
-- convert `.atl` to Markdown
-- convert Markdown back to `.atl`
-- publish `.atl` or Markdown back to existing Confluence pages
+- download Confluence pages as Atlas
+  - Atlas is Confluence's name for its native document storage format. Atlas is a dialect of html. `cflmd` uses `.atl` for Atlas files.
+- convert Atlas to Markdown
+- convert Markdown back to Atlas
+- publish Atlas or Markdown back to existing Confluence pages
 - download and convert to markdown in one step
 - convert to Confluence and publish in one step
 
@@ -141,7 +141,7 @@ EOF
 
 ### `get`
 
-Download a Confluence page as raw `.atl`:
+Download a Confluence page as raw Atlas:
 
 ```bash
 ./cflmd get 'https://example.atlassian.net/wiki/spaces/ENG/pages/12345/Page' --output=page.atl
@@ -149,7 +149,7 @@ Download a Confluence page as raw `.atl`:
 
 ### `export`
 
-Convert `.atl` to Markdown:
+Convert Atlas to Markdown:
 
 ```bash
 ./cflmd export --input=page.atl --output=page.md
@@ -163,7 +163,7 @@ You can also fetch from Confluence and export directly:
   --output=page.md
 ```
 
-If `--input` is omitted, `export` reads `.atl` from stdin.
+If `--input` is omitted, `export` reads Atlas from stdin.
 
 ### `pull`
 
@@ -189,7 +189,7 @@ Each manifest entry behaves like:
 
 ### `import`
 
-Convert Markdown to `.atl`:
+Convert Markdown to Atlas:
 
 ```bash
 ./cflmd import --input=page.md --output=page.atl
@@ -237,7 +237,7 @@ Each manifest entry behaves like:
 
 ### `put`
 
-Publish an existing `.atl` document back to Confluence:
+Publish an existing Atlas document back to Confluence:
 
 ```bash
 ./cflmd put \
@@ -256,7 +256,7 @@ Building standalone release binaries requires Node.js 25.5+ because `make dist` 
 
 ## Metadata Format
 
-Both `.atl` files and exported Markdown carry a leading metadata comment:
+Both Atlas files and exported Markdown carry a leading metadata comment:
 
 ```html
 <!-- cflmd-metadata: {"pageId":"265021483","version":{"number":2,"time":"2026-03-16T16:50:22Z"}} -->
